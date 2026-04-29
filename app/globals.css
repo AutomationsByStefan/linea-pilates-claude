@@ -1,0 +1,72 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Cormorant+Garamond:wght@600;700&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'DM Sans', sans-serif; background: #f5f2ed; color: #1a1a1a; }
+input, select, textarea { font-family: 'DM Sans', sans-serif; outline: none; }
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+
+/* ── Layout ── */
+.lp-header-band { background: linear-gradient(135deg, #2c1810 0%, #4a2c2a 50%, #6b3a3a 100%); padding: 18px 20px 14px; color: white; }
+.lp-header-inner { display: flex; justify-content: space-between; align-items: center; max-width: 1200px; margin: 0 auto; }
+.lp-nav-band { display: flex; background: white; border-bottom: 1px solid #e0dcd5; position: sticky; top: 0; z-index: 100; overflow-x: auto; }
+.lp-nav-inner { display: flex; max-width: 1200px; margin: 0 auto; width: 100%; }
+.lp-content { flex: 1; padding: 14px; max-width: 1200px; margin: 0 auto; width: 100%; }
+
+/* ── Stats grid ── */
+.lp-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 18px; }
+
+/* ── Cards ── */
+.lp-card { background: white; border-radius: 16px; border: 1px solid #e0dcd5; padding: 16px; margin-bottom: 10px; transition: box-shadow .15s; }
+.lp-card-click { cursor: pointer; }
+.lp-card-click:hover { box-shadow: 0 6px 20px rgba(0,0,0,.08); }
+
+/* ── Calendar ── */
+.lp-cal-slots { display: grid; grid-template-columns: 1fr; gap: 0; }
+
+/* ── Members list ── */
+.lp-members-grid { display: grid; grid-template-columns: 1fr; }
+
+/* ── Detail cols ── */
+.lp-detail-cols { display: grid; grid-template-columns: 1fr; gap: 0; }
+
+/* ── Schedule ── */
+.lp-schedule-wrap { overflow-x: auto; background: white; border-radius: 14px; border: 1px solid #e0dcd5; }
+.lp-schedule-wrap td, .lp-schedule-wrap th { padding: 6px 4px; }
+
+/* ════════════════════════════════════
+   Desktop (≥ 900px)
+════════════════════════════════════ */
+@media (min-width: 900px) {
+  .lp-header-band { padding: 22px 40px 18px; }
+  .lp-content { padding: 28px 40px; }
+
+  /* 4-column stats */
+  .lp-stats { grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
+  .lp-stats > div { padding: 20px 22px !important; border-radius: 18px !important; }
+  .lp-stats > div > div:first-child { font-size: 13px !important; }
+  .lp-stats > div > div:last-child { font-size: 34px !important; }
+
+  /* Bigger cards */
+  .lp-card { padding: 20px 24px; border-radius: 18px; }
+
+  /* Calendar: morning + evening side by side */
+  .lp-cal-slots { grid-template-columns: 1fr 1fr; gap: 16px; }
+
+  /* Members: 2-column list */
+  .lp-members-grid { grid-template-columns: 1fr 1fr; gap: 0 16px; }
+
+  /* Detail: payments + sessions side by side */
+  .lp-detail-cols { grid-template-columns: 1fr 1fr; gap: 16px; }
+  .lp-detail-cols > * { margin-bottom: 0 !important; }
+
+  /* Schedule: bigger cells */
+  .lp-schedule-wrap td { padding: 8px 6px !important; min-width: 70px; }
+  .lp-schedule-wrap th { padding: 10px 4px !important; }
+  .lp-schedule-wrap td > div > div { font-size: 10px !important; padding: 3px 2px !important; }
+
+  /* Nav tabs bigger */
+  .lp-nav-inner button { padding: 14px 8px !important; }
+  .lp-nav-inner button > div:first-child { font-size: 20px !important; }
+  .lp-nav-inner button > div:last-child { font-size: 12px !important; }
+}
