@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase, transformMember } from '@/lib/supabase';
+import { syncNewMember } from '@/lib/sheets';
 
 export async function GET() {
   const { data, error } = await supabase
@@ -45,5 +46,7 @@ export async function POST(req: Request) {
     .eq('id', member.id)
     .single();
 
-  return NextResponse.json(transformMember(full as Record<string, unknown>));
+  const transformed = transformMember(full as Record<string, unknown>);
+  syncNewMember(transformed.name, transformed.phone, today);
+  return NextResponse.json(transformed);
 }
