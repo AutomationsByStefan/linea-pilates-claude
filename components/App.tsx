@@ -194,6 +194,13 @@ export default function App() {
     }
   }
 
+  async function deletePayment(memberId: string, paymentId: string) {
+    if (!confirm('Obrisati ovu uplatu? Ovo će smanjiti ukupan broj treninga.')) return;
+    const res = await fetch(`/api/members/${memberId}/payments/${paymentId}`, { method: 'DELETE' });
+    const updated = await res.json();
+    setMembers(prev => prev.map(m => m.id === memberId ? updated : m));
+  }
+
   async function bookTrial() {
     if (!trialModal || !trialName.trim()) return;
     const { date, time } = trialModal;
@@ -392,9 +399,13 @@ export default function App() {
                 </div>
                 {member.payments.length === 0 && <p style={{ fontSize: 12, color: T.textDim }}>Nema uplata</p>}
                 {member.payments.map((p, i) => (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: `1px solid ${T.border}`, fontSize: 12 }}>
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: `1px solid ${T.border}`, fontSize: 12 }}>
                     <span style={{ color: T.textMuted }}>{fmtDate(p.date)} — {p.package}</span>
-                    <span style={{ fontWeight: 700, color: T.green }}>{p.amount} KM ({p.sessions} tr.)</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontWeight: 700, color: T.green }}>{p.amount} KM ({p.sessions} tr.)</span>
+                      <button onClick={() => deletePayment(member.id, p.id)}
+                        style={{ background: T.redBg, color: T.red, border: `1px solid ${T.redBorder}`, borderRadius: 6, padding: '2px 7px', fontSize: 10, cursor: 'pointer', fontWeight: 700 }}>✕</button>
+                    </div>
                   </div>
                 ))}
                 <div style={{ marginTop: 6, fontWeight: 700, fontSize: 13, textAlign: 'right', color: T.gold }}>Ukupno: {member.paid} KM</div>

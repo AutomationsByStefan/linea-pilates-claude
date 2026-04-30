@@ -1,7 +1,7 @@
 import { google } from 'googleapis';
 
 const SHEET_ID = process.env.GOOGLE_SHEET_ID;
-const DAYS_SR = ['Nedjelja', 'Ponedjeljak', 'Utorak', 'Srijeda', 'Četvrtak', 'Petak', 'Subota'];
+const SHEET_NAME = 'Evidencija';
 
 function getClient() {
   if (!SHEET_ID || !process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !process.env.GOOGLE_PRIVATE_KEY) {
@@ -17,13 +17,13 @@ function getClient() {
   return google.sheets({ version: 'v4', auth });
 }
 
-async function append(sheetName: string, row: (string | number)[]) {
+async function append(row: (string | number)[]) {
   const client = getClient();
   if (!client) return;
   try {
     await client.spreadsheets.values.append({
       spreadsheetId: SHEET_ID!,
-      range: `'${sheetName}'!A1`,
+      range: `'${SHEET_NAME}'!A1`,
       valueInputOption: 'USER_ENTERED',
       insertDataOption: 'INSERT_ROWS',
       requestBody: { values: [row] },
@@ -33,25 +33,32 @@ async function append(sheetName: string, row: (string | number)[]) {
   }
 }
 
-async function findRowAndUpdate(sheetName: string, memberName: string, updates: Record<string, string | number>) {
+async function findRowIndex(memberName: string): Promise<number | null> {
   const client = getClient();
-  if (!client) return;
+  if (!client) return null;
   try {
     const res = await client.spreadsheets.values.get({
       spreadsheetId: SHEET_ID!,
-      range: `'${sheetName}'!A:A`,
+      range: `'${SHEET_NAME}'!A:A`,
     });
     const rows = res.data.values ?? [];
-    const rowIdx = rows.findIndex((r, i) => i > 0 && r[0] === memberName);
-    if (rowIdx < 1) return;
-    const rowNum = rowIdx + 1;
+    const idx = rows.findIndex((r, i) => i > 0 && r[0] === memberName);
+    return idx > 0 ? idx + 1 : null; // 1-indexed
+  } catch {
+    return null;
+  }
+}
 
+async function updateRow(rowNum: number, updates: Record<string, string | number>) {
+  const client = getClient();
+  if (!client) return;
+  try {
     await client.spreadsheets.values.batchUpdate({
       spreadsheetId: SHEET_ID!,
       requestBody: {
         valueInputOption: 'USER_ENTERED',
         data: Object.entries(updates).map(([col, val]) => ({
-          range: `'${sheetName}'!${col}${rowNum}`,
+          range: `'${SHEET_NAME}'!${col}${rowNum}`,
           values: [[val]],
         })),
       },
@@ -61,45 +68,46 @@ async function findRowAndUpdate(sheetName: string, memberName: string, updates: 
   }
 }
 
-function timestamp() {
-  return new Date().toLocaleString('sr-Latn', {
-    timeZone: 'Europe/Sarajevo',
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  });
+function fmtDate(d: string) {
+  if (!d) return '';
+  const [y, m, dd] = d.split('-');
+  return `${dd}.${m}.${y}`;
 }
 
-// Called when a new member is created (trial)
+// ─── Public sync functions ────────────────────────────────────────────────────
+
+// Called when a new member is created
 export function syncNewMember(name: string, phone: string, date: string) {
-  append('Članice', [name, phone || '-', 'Probni', '-', 0, date]).catch(() => {});
+  append([name, phone || '-', 'Probni', '-', 0, 0, '', 0, fmtDate(date), '-']).catch(() => {});
+  // Cols: A=Ime, B=Tel, C=Status, D=Paket, E=Ukupno, F=Iskorišćeno, G=Preostalo(formula), H=Zarada, I=Datum upisa, J=Zadnja uplata
 }
 
-// Called when a payment is added — updates Uplate sheet and member row in Članice
+// Called when a payment is added
 export function syncPayment(
   memberName: string,
   pkg: string,
-  amount: number,
-  sessions: number,
   newTotalSessions: number,
-  date: string,
+  usedSessions: number,
+  totalPaid: number,
+  paymentDate: string,
 ) {
-  append('Uplate', [date, memberName, pkg, amount, sessions, timestamp()]).catch(() => {});
-  findRowAndUpdate('Članice', memberName, {
-    C: 'Aktivna',
-    D: pkg,
-    E: newTotalSessions,
+  findRowIndex(memberName).then(rowNum => {
+    if (!rowNum) return;
+    updateRow(rowNum, {
+      C: 'Aktivna',
+      D: pkg,
+      E: newTotalSessions,
+      F: usedSessions,
+      H: totalPaid,
+      J: fmtDate(paymentDate),
+    });
   }).catch(() => {});
 }
 
-// Called when a session is booked
-export function syncSession(memberName: string, date: string, time: string, trial: boolean) {
-  const d = new Date(date);
-  append('Termini', [
-    date,
-    DAYS_SR[d.getDay()],
-    memberName,
-    time,
-    trial ? 'Probni' : 'Redovni',
-    timestamp(),
-  ]).catch(() => {});
+// Called when a session is booked (updates used count)
+export function syncSessionBooked(memberName: string, usedSessions: number) {
+  findRowIndex(memberName).then(rowNum => {
+    if (!rowNum) return;
+    updateRow(rowNum, { F: usedSessions });
+  }).catch(() => {});
 }

@@ -42,6 +42,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     .single();
 
   const transformed = transformMember(data as Record<string, unknown>);
-  syncPayment(transformed.name, body.package, body.amount, body.sessions, newTotalSessions, today);
+  const usedCount = transformed.sessions.filter(s =>
+    !s.trial && s.date <= today
+  ).length;
+  syncPayment(transformed.name, body.package, newTotalSessions, usedCount, newPaid, today);
   return NextResponse.json(transformed);
 }
