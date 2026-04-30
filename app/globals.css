@@ -44,8 +44,8 @@ input, select, textarea { font-family: 'DM Sans', sans-serif; outline: none; }
   /* 4-column stats */
   .lp-stats { grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
   .lp-stats > div { padding: 20px 22px !important; border-radius: 18px !important; }
-  .lp-stats > div > div:first-child { font-size: 13px !important; }
-  .lp-stats > div > div:last-child { font-size: 34px !important; }
+  .lp-stats > div > div:first-child { font-size: 11px !important; }
+  .lp-stats > div > div:last-child { font-size: 32px !important; font-weight: 700 !important; }
 
   /* Bigger cards */
   .lp-card { padding: 20px 24px; border-radius: 18px; }

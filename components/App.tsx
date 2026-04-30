@@ -73,8 +73,8 @@ function Card({ children, style, onClick }: { children: React.ReactNode; style?:
 function StatBox({ label, value, accent }: { label: string; value: string | number; accent?: string }) {
   return (
     <div style={{ background: T.surfaceLight, borderRadius: 12, padding: '14px 12px', textAlign: 'center', border: `1px solid ${T.border}` }}>
+      <div style={{ fontSize: 11, color: T.textMuted, fontWeight: 500, marginBottom: 6 }}>{label}</div>
       <div style={{ fontSize: 24, fontWeight: 700, color: accent || T.bronzeLight }}>{value}</div>
-      <div style={{ fontSize: 10, color: T.textMuted, marginTop: 2, fontWeight: 500 }}>{label}</div>
     </div>
   );
 }
@@ -284,8 +284,8 @@ export default function App() {
             {nav.map(n => (
               <button key={n.id} onClick={() => { setView(n.id); setSelId(null); }}
                 style={{ flex: 1, minWidth: 50, padding: '10px 2px', border: 'none', background: 'transparent', cursor: 'pointer', borderBottom: view === n.id ? `2px solid ${T.bronze}` : '2px solid transparent' }}>
-                <div style={{ fontSize: 14 }}>{n.icon}</div>
-                <div style={{ fontSize: 9, fontWeight: view === n.id ? 700 : 400, color: view === n.id ? T.bronzeLight : T.textDim, marginTop: 1 }}>{n.label}</div>
+                <div style={{ fontSize: 14, color: view === n.id ? T.bronzeLight : 'rgba(255,255,255,0.6)' }}>{n.icon}</div>
+                <div style={{ fontSize: 9, fontWeight: view === n.id ? 700 : 400, color: view === n.id ? T.bronzeLight : 'rgba(255,255,255,0.6)', marginTop: 1 }}>{n.label}</div>
               </button>
             ))}
           </div>
@@ -441,83 +441,95 @@ export default function App() {
 
             {calSlots.length === 0 ? (
               <Card><p style={{ fontSize: 13, color: T.textDim, textAlign: 'center' }}>Neradni dan</p></Card>
-            ) : <div className="lp-cal-slots">{calSlots.map(time => {
-              const key = `${calDate}_${time}`, booked = slotMap[key] || [], taken = booked.length, free = MAX_REFORMERS - taken;
-              const isOpen = calSlot === time;
-              const isBooking = bookingSlot && bookingSlot.date === calDate && bookingSlot.time === time;
-              const bookableMembers = members.filter(m => !booked.find(b => b.memberId === m.id) && (!bookSearch || m.name.toLowerCase().includes(bookSearch.toLowerCase())));
-              return (
-                <Card key={time} onClick={() => { setCalSlot(isOpen ? null : time); if (isOpen) setBookingSlot(null); }}
-                  style={{ borderColor: taken >= MAX_REFORMERS ? T.redBorder : taken > 0 ? T.orangeBorder : T.greenBorder }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ fontSize: 18, fontWeight: 700, color: T.bronzeLight, minWidth: 40 }}>{time}</div>
-                      <div style={{ display: 'flex', gap: 4 }}>
-                        {Array.from({ length: MAX_REFORMERS }).map((_, ri) => (
-                          <div key={ri} style={{ width: 22, height: 22, borderRadius: 6, background: ri < taken ? (booked[ri]?.trial ? T.redBg : T.bronze) : T.surfaceLighter, border: `1px solid ${ri < taken ? (booked[ri]?.trial ? T.redBorder : T.bronze) : T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: ri < taken ? (booked[ri]?.trial ? T.red : '#fff') : T.textDim, fontWeight: 700 }}>
-                            {ri < taken ? (booked[ri]?.trial ? 'P' : '●') : ''}
-                          </div>
-                        ))}
+            ) : (() => {
+              const morningSlots = calSlots.filter(t => parseHour(t) < 12);
+              const afternoonSlots = calSlots.filter(t => parseHour(t) >= 12);
+              const renderSlot = (time: string) => {
+                const key = `${calDate}_${time}`, booked = slotMap[key] || [], taken = booked.length, free = MAX_REFORMERS - taken;
+                const isOpen = calSlot === time;
+                const isBooking = bookingSlot && bookingSlot.date === calDate && bookingSlot.time === time;
+                const bookableMembers = members.filter(m => !booked.find(b => b.memberId === m.id) && (!bookSearch || m.name.toLowerCase().includes(bookSearch.toLowerCase())));
+                return (
+                  <Card key={time} onClick={() => { setCalSlot(isOpen ? null : time); if (isOpen) setBookingSlot(null); }}
+                    style={{ borderColor: taken >= MAX_REFORMERS ? T.redBorder : taken > 0 ? T.orangeBorder : T.greenBorder }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{ fontSize: 18, fontWeight: 700, color: T.bronzeLight, minWidth: 40 }}>{time}</div>
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          {Array.from({ length: MAX_REFORMERS }).map((_, ri) => (
+                            <div key={ri} style={{ width: 22, height: 22, borderRadius: 6, background: ri < taken ? (booked[ri]?.trial ? T.redBg : T.bronze) : T.surfaceLighter, border: `1px solid ${ri < taken ? (booked[ri]?.trial ? T.redBorder : T.bronze) : T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: ri < taken ? (booked[ri]?.trial ? T.red : '#fff') : T.textDim, fontWeight: 700 }}>
+                              {ri < taken ? (booked[ri]?.trial ? 'P' : '●') : ''}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: free === 0 ? T.red : free <= 1 ? T.orange : T.green }}>{free === 0 ? 'PUNO' : `${free} sl.`}</div>
+                        <div style={{ fontSize: 10, color: T.textDim }}>{taken}/{MAX_REFORMERS}</div>
                       </div>
                     </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: free === 0 ? T.red : free <= 1 ? T.orange : T.green }}>{free === 0 ? 'PUNO' : `${free} sl.`}</div>
-                      <div style={{ fontSize: 10, color: T.textDim }}>{taken}/{MAX_REFORMERS}</div>
-                    </div>
-                  </div>
 
-                  {isOpen && (
-                    <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${T.border}` }}>
-                      {booked.map((b, i) => (
-                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', fontSize: 12, borderBottom: `1px solid ${T.border}` }}>
-                          <span style={{ fontWeight: 600 }}>{b.name}{b.trial && <span style={{ background: T.redBg, color: T.red, padding: '1px 6px', borderRadius: 4, fontSize: 9, fontWeight: 700, marginLeft: 6 }}>PROBNI</span>}</span>
-                          <div style={{ display: 'flex', gap: 4 }}>
-                            <button onClick={e => { e.stopPropagation(); setSelId(b.memberId); setView('members'); }} style={{ ...btnPrimary, padding: '3px 8px', fontSize: 10 }}>Profil</button>
-                            <button onClick={e => { e.stopPropagation(); bookSlot(b.memberId, calDate, time, b.trial); }} style={{ background: T.redBg, color: T.red, border: `1px solid ${T.redBorder}`, borderRadius: 6, padding: '3px 8px', fontSize: 10, cursor: 'pointer', fontWeight: 600 }}>✕</button>
+                    {isOpen && (
+                      <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${T.border}` }}>
+                        {booked.map((b, i) => (
+                          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', fontSize: 12, borderBottom: `1px solid ${T.border}` }}>
+                            <span style={{ fontWeight: 600 }}>{b.name}{b.trial && <span style={{ background: T.redBg, color: T.red, padding: '1px 6px', borderRadius: 4, fontSize: 9, fontWeight: 700, marginLeft: 6 }}>PROBNI</span>}</span>
+                            <div style={{ display: 'flex', gap: 4 }}>
+                              <button onClick={e => { e.stopPropagation(); setSelId(b.memberId); setView('members'); }} style={{ ...btnPrimary, padding: '3px 8px', fontSize: 10 }}>Profil</button>
+                              <button onClick={e => { e.stopPropagation(); bookSlot(b.memberId, calDate, time, b.trial); }} style={{ background: T.redBg, color: T.red, border: `1px solid ${T.redBorder}`, borderRadius: 6, padding: '3px 8px', fontSize: 10, cursor: 'pointer', fontWeight: 600 }}>✕</button>
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                      {free > 0 && !isBooking && (
-                        <button onClick={e => { e.stopPropagation(); setBookingSlot({ date: calDate, time }); setBookSearch(''); }}
-                          style={{ width: '100%', marginTop: 8, padding: 10, background: T.greenBg, color: T.green, border: `1px dashed ${T.greenBorder}`, borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
-                          + Zakaži na {time}
-                        </button>
-                      )}
-                      {isBooking && (
-                        <div onClick={e => e.stopPropagation()} style={{ marginTop: 8, padding: 12, background: T.surfaceLight, borderRadius: 10, border: `1px solid ${T.border}` }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                            <span style={{ fontSize: 12, fontWeight: 700, color: T.bronzeLight }}>Zakaži na {time}</span>
-                            <button onClick={() => setBookingSlot(null)} style={{ background: 'none', border: 'none', fontSize: 14, cursor: 'pointer', color: T.textMuted }}>✕</button>
-                          </div>
-                          <input placeholder="Pretraži članice..." value={bookSearch} onChange={e => setBookSearch(e.target.value)} autoFocus style={{ ...inputStyle, marginBottom: 6 }} />
-                          <div style={{ maxHeight: 180, overflowY: 'auto' }}>
-                            {bookableMembers.slice(0, 15).map(m => (
-                              <div key={m.id} onClick={() => { bookSlot(m.id, calDate, time, false); setBookingSlot(null); setBookSearch(''); }}
-                                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 6px', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}
-                                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = T.surfaceLighter}
-                                onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                  <div style={{ width: 26, height: 26, borderRadius: '50%', background: m.status === 'active' ? T.bronze : T.orange, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: 11 }}>{m.name.charAt(0)}</div>
-                                  <div>
-                                    <div style={{ fontWeight: 600, color: T.text }}>{m.name}</div>
-                                    <div style={{ fontSize: 10, color: T.textMuted }}>{m.status === 'active' ? `${m.package} • ${getScheduledRemaining(m)} preost.` : m.comment}</div>
-                                  </div>
-                                </div>
-                                <span style={{ color: T.green, fontWeight: 700, fontSize: 16 }}>+</span>
-                              </div>
-                            ))}
-                          </div>
-                          <button onClick={() => { setTrialModal({ date: calDate, time }); setTrialName(''); }}
-                            style={{ width: '100%', marginTop: 8, padding: 8, background: T.orangeBg, color: T.orange, border: `1px dashed ${T.orangeBorder}`, borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
-                            + Probni trening (nova osoba)
+                        ))}
+                        {free > 0 && !isBooking && (
+                          <button onClick={e => { e.stopPropagation(); setBookingSlot({ date: calDate, time }); setBookSearch(''); }}
+                            style={{ width: '100%', marginTop: 8, padding: 10, background: T.greenBg, color: T.green, border: `1px dashed ${T.greenBorder}`, borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                            + Zakaži na {time}
                           </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </Card>
+                        )}
+                        {isBooking && (
+                          <div onClick={e => e.stopPropagation()} style={{ marginTop: 8, padding: 12, background: T.surfaceLight, borderRadius: 10, border: `1px solid ${T.border}` }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                              <span style={{ fontSize: 12, fontWeight: 700, color: T.bronzeLight }}>Zakaži na {time}</span>
+                              <button onClick={() => setBookingSlot(null)} style={{ background: 'none', border: 'none', fontSize: 14, cursor: 'pointer', color: T.textMuted }}>✕</button>
+                            </div>
+                            <input placeholder="Pretraži članice..." value={bookSearch} onChange={e => setBookSearch(e.target.value)} autoFocus style={{ ...inputStyle, marginBottom: 6 }} />
+                            <div style={{ maxHeight: 180, overflowY: 'auto' }}>
+                              {bookableMembers.slice(0, 15).map(m => (
+                                <div key={m.id} onClick={() => { bookSlot(m.id, calDate, time, false); setBookingSlot(null); setBookSearch(''); }}
+                                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 6px', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}
+                                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = T.surfaceLighter}
+                                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <div style={{ width: 26, height: 26, borderRadius: '50%', background: m.status === 'active' ? T.bronze : T.orange, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: 11 }}>{m.name.charAt(0)}</div>
+                                    <div>
+                                      <div style={{ fontWeight: 600, color: T.text }}>{m.name}</div>
+                                      <div style={{ fontSize: 10, color: T.textMuted }}>{m.status === 'active' ? `${m.package} • ${getScheduledRemaining(m)} preost.` : m.comment}</div>
+                                    </div>
+                                  </div>
+                                  <span style={{ color: T.green, fontWeight: 700, fontSize: 16 }}>+</span>
+                                </div>
+                              ))}
+                            </div>
+                            <button onClick={() => { setTrialModal({ date: calDate, time }); setTrialName(''); }}
+                              style={{ width: '100%', marginTop: 8, padding: 8, background: T.orangeBg, color: T.orange, border: `1px dashed ${T.orangeBorder}`, borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                              + Probni trening (nova osoba)
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </Card>
+                );
+              };
+              return afternoonSlots.length > 0 ? (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>{morningSlots.map(renderSlot)}</div>
+                  <div>{afternoonSlots.map(renderSlot)}</div>
+                </div>
+              ) : (
+                <div>{morningSlots.map(renderSlot)}</div>
               );
-            })}</div>}
+            })()}
           </>}
 
           {/* ===== WEEKLY SCHEDULE ===== */}
