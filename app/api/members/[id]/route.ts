@@ -1,18 +1,20 @@
 import { NextResponse } from 'next/server';
 import { supabase, transformMember } from '@/lib/supabase';
 
-export async function GET(_: Request, { params }: { params: { id: string } }) {
+export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const { data, error } = await supabase
     .from('members')
     .select('*, sessions(*), payments(*)')
-    .eq('id', params.id)
+    .eq('id', id)
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 404 });
   return NextResponse.json(transformMember(data as Record<string, unknown>));
 }
 
-export async function PUT(req: Request, { params }: { params: { id: string } }) {
+export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const body = await req.json();
 
   const update: Record<string, unknown> = {};
@@ -27,20 +29,21 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
   if (body.paid !== undefined) update.paid = body.paid;
   if (body.firstPaidDate !== undefined) update.first_paid_date = body.firstPaidDate || null;
 
-  const { error } = await supabase.from('members').update(update).eq('id', params.id);
+  const { error } = await supabase.from('members').update(update).eq('id', id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const { data } = await supabase
     .from('members')
     .select('*, sessions(*), payments(*)')
-    .eq('id', params.id)
+    .eq('id', id)
     .single();
 
   return NextResponse.json(transformMember(data as Record<string, unknown>));
 }
 
-export async function DELETE(_: Request, { params }: { params: { id: string } }) {
-  const { error } = await supabase.from('members').delete().eq('id', params.id);
+export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const { error } = await supabase.from('members').delete().eq('id', id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
 }

@@ -3,13 +3,14 @@ import { supabase } from '@/lib/supabase';
 
 export async function DELETE(
   _: Request,
-  { params }: { params: { id: string; sessionId: string } }
+  { params }: { params: Promise<{ id: string; sessionId: string }> }
 ) {
+  const { id, sessionId } = await params;
   const { error } = await supabase
     .from('sessions')
     .delete()
-    .eq('id', params.sessionId)
-    .eq('member_id', params.id);
+    .eq('id', sessionId)
+    .eq('member_id', id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
