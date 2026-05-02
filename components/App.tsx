@@ -46,9 +46,17 @@ const PACKAGES = [
   { name: 'Set 10+2', sessions: 12, price: 145 },
   { name: 'Set 12', sessions: 12, price: 175 },
   { name: 'Set 12+2', sessions: 14, price: 175 },
+  { name: 'Set 8 ind.', sessions: 8, price: 280 },
   { name: 'Set 12 ind.', sessions: 12, price: 360 },
   { name: 'Pojedinačni', sessions: 1, price: 15 },
 ];
+
+function isIndPkg(pkg: string) { return pkg.toLowerCase().includes('ind.'); }
+
+// Individual training occupies all 3 reformers — compute "effective taken" for a slot
+function slotTaken(booked: { individual: boolean }[]) {
+  return booked.some(b => b.individual) ? MAX_REFORMERS : booked.length;
+}
 
 function Badge({ type, text }: { type: string; text: string }) {
   const styles: Record<string, { bg: string; color: string; border: string }> = {
@@ -120,11 +128,11 @@ export default function App() {
   const getScheduledRemaining = useCallback((m: Member) => m.totalSessions - getScheduledCount(m), [getScheduledCount]);
 
   const slotMap = useMemo(() => {
-    const map: Record<string, { memberId: string; name: string; trial: boolean }[]> = {};
+    const map: Record<string, { memberId: string; name: string; trial: boolean; individual: boolean }[]> = {};
     members.forEach(m => m.sessions.forEach(s => {
       const key = `${s.date}_${s.time}`;
       if (!map[key]) map[key] = [];
-      map[key].push({ memberId: m.id, name: m.name, trial: s.trial });
+      map[key].push({ memberId: m.id, name: m.name, trial: s.trial, individual: isIndPkg(m.package) });
     }));
     return map;
   }, [members]);
@@ -193,6 +201,18 @@ export default function App() {
       setMembers(prev => prev.map(x => x.id !== memberId ? x : { ...x, sessions: x.sessions.filter(s => s.id !== exists.id) }));
       await fetch(`/api/members/${memberId}/sessions/${exists.id}`, { method: 'DELETE' });
     } else {
+      // Capacity validation for individual packages
+      const currentSlot = slotMap[`${date}_${time}`] || [];
+      const memberIsInd = isIndPkg(m.package);
+      const slotHasInd = currentSlot.some(b => b.individual);
+      if (memberIsInd && currentSlot.length > 0) {
+        alert('Individualni trening zahtijeva slobodan termin. Termin je već zauzet.');
+        return;
+      }
+      if (slotHasInd) {
+        alert('U ovom terminu je zakazan individualni trening — termin je zauzet.');
+        return;
+      }
       const tempId = 'temp-' + Date.now();
       setMembers(prev => prev.map(x => x.id !== memberId ? x : { ...x, sessions: [...x.sessions, { id: tempId, date, time, trial }] }));
       const res = await fetch(`/api/members/${memberId}/sessions`, {
@@ -466,26 +486,50 @@ export default function App() {
               const morningSlots = calSlots.filter(t => parseHour(t) < 12);
               const afternoonSlots = calSlots.filter(t => parseHour(t) >= 12);
               const renderSlot = (time: string) => {
-                const key = `${calDate}_${time}`, booked = slotMap[key] || [], taken = booked.length, free = MAX_REFORMERS - taken;
+                const key = `${calDate}_${time}`;
+                const booked = slotMap[key] || [];
+                const hasInd = booked.some(b => b.individual);
+                const taken = slotTaken(booked);
+                const free = MAX_REFORMERS - taken;
                 const isOpen = calSlot === time;
                 const isBooking = bookingSlot && bookingSlot.date === calDate && bookingSlot.time === time;
-                const bookableMembers = members.filter(m => !booked.find(b => b.memberId === m.id) && (!bookSearch || m.name.toLowerCase().includes(bookSearch.toLowerCase())));
+                const bookableMembers = members.filter(m => {
+                  if (booked.find(b => b.memberId === m.id)) return false;
+                  if (hasInd) return false; // slot blocked by individual
+                  if (isIndPkg(m.package) && booked.length > 0) return false; // individual needs empty slot
+                  if (bookSearch && !m.name.toLowerCase().includes(bookSearch.toLowerCase())) return false;
+                  return true;
+                });
+                const indColor = '#a78bfa';
+                const indBg = 'rgba(167,139,250,.12)';
+                const indBorder = 'rgba(167,139,250,.35)';
                 return (
                   <Card key={time} onClick={() => { setCalSlot(isOpen ? null : time); if (isOpen) setBookingSlot(null); }}
-                    style={{ borderColor: taken >= MAX_REFORMERS ? T.redBorder : taken > 0 ? T.orangeBorder : T.greenBorder }}>
+                    style={{ borderColor: taken >= MAX_REFORMERS ? (hasInd ? indBorder : T.redBorder) : taken > 0 ? T.orangeBorder : T.greenBorder }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <div style={{ fontSize: 18, fontWeight: 700, color: T.bronzeLight, minWidth: 40 }}>{time}</div>
                         <div style={{ display: 'flex', gap: 4 }}>
-                          {Array.from({ length: MAX_REFORMERS }).map((_, ri) => (
-                            <div key={ri} style={{ width: 22, height: 22, borderRadius: 6, background: ri < taken ? (booked[ri]?.trial ? T.redBg : T.bronze) : T.surfaceLighter, border: `1px solid ${ri < taken ? (booked[ri]?.trial ? T.redBorder : T.bronze) : T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: ri < taken ? (booked[ri]?.trial ? T.red : '#fff') : T.textDim, fontWeight: 700 }}>
-                              {ri < taken ? (booked[ri]?.trial ? 'P' : '●') : ''}
-                            </div>
-                          ))}
+                          {Array.from({ length: MAX_REFORMERS }).map((_, ri) => {
+                            const b = booked[ri];
+                            const filledByInd = hasInd && ri < MAX_REFORMERS;
+                            const isActualBooking = !hasInd && b;
+                            const bg = filledByInd ? (ri === 0 ? indBg : 'rgba(167,139,250,.06)') : isActualBooking ? (b.trial ? T.redBg : T.bronze) : T.surfaceLighter;
+                            const border = filledByInd ? indBorder : isActualBooking ? (b.trial ? T.redBorder : T.bronze) : T.border;
+                            const color = filledByInd ? indColor : isActualBooking ? (b.trial ? T.red : '#fff') : T.textDim;
+                            const label = filledByInd ? (ri === 0 ? 'IND' : '·') : isActualBooking ? (b.trial ? 'P' : '●') : '';
+                            return (
+                              <div key={ri} style={{ width: 22, height: 22, borderRadius: 6, background: bg, border: `1px solid ${border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: ri === 0 && filledByInd ? 7 : 9, color, fontWeight: 700 }}>
+                                {label}
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                       <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: free === 0 ? T.red : free <= 1 ? T.orange : T.green }}>{free === 0 ? 'PUNO' : `${free} sl.`}</div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: free === 0 ? (hasInd ? indColor : T.red) : free <= 1 ? T.orange : T.green }}>
+                          {free === 0 ? (hasInd ? 'IND' : 'PUNO') : `${free} sl.`}
+                        </div>
                         <div style={{ fontSize: 10, color: T.textDim }}>{taken}/{MAX_REFORMERS}</div>
                       </div>
                     </div>
@@ -494,7 +538,11 @@ export default function App() {
                       <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${T.border}` }}>
                         {booked.map((b, i) => (
                           <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', fontSize: 12, borderBottom: `1px solid ${T.border}` }}>
-                            <span style={{ fontWeight: 600 }}>{b.name}{b.trial && <span style={{ background: T.redBg, color: T.red, padding: '1px 6px', borderRadius: 4, fontSize: 9, fontWeight: 700, marginLeft: 6 }}>PROBNI</span>}</span>
+                            <span style={{ fontWeight: 600 }}>
+                              {b.name}
+                              {b.trial && <span style={{ background: T.redBg, color: T.red, padding: '1px 6px', borderRadius: 4, fontSize: 9, fontWeight: 700, marginLeft: 6 }}>PROBNI</span>}
+                              {b.individual && <span style={{ background: indBg, color: indColor, padding: '1px 6px', borderRadius: 4, fontSize: 9, fontWeight: 700, marginLeft: 6, border: `1px solid ${indBorder}` }}>IND</span>}
+                            </span>
                             <div style={{ display: 'flex', gap: 4 }}>
                               <button onClick={e => { e.stopPropagation(); setSelId(b.memberId); setView('members'); }} style={{ ...btnPrimary, padding: '3px 8px', fontSize: 10 }}>Profil</button>
                               <button onClick={e => { e.stopPropagation(); bookSlot(b.memberId, calDate, time, b.trial); }} style={{ background: T.redBg, color: T.red, border: `1px solid ${T.redBorder}`, borderRadius: 6, padding: '3px 8px', fontSize: 10, cursor: 'pointer', fontWeight: 600 }}>✕</button>
@@ -515,6 +563,11 @@ export default function App() {
                             </div>
                             <input placeholder="Pretraži članice..." value={bookSearch} onChange={e => setBookSearch(e.target.value)} autoFocus style={{ ...inputStyle, marginBottom: 6 }} />
                             <div style={{ maxHeight: 180, overflowY: 'auto' }}>
+                              {bookableMembers.length === 0 && (
+                                <p style={{ fontSize: 11, color: T.textDim, textAlign: 'center', padding: '8px 0' }}>
+                                  {hasInd ? 'Termin zauzet individualnim treningom' : 'Nema dostupnih članica'}
+                                </p>
+                              )}
                               {bookableMembers.slice(0, 15).map(m => (
                                 <div key={m.id} onClick={() => { bookSlot(m.id, calDate, time, false); setBookingSlot(null); setBookSearch(''); }}
                                   style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 6px', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}
@@ -524,7 +577,10 @@ export default function App() {
                                     <div style={{ width: 26, height: 26, borderRadius: '50%', background: m.status === 'active' ? T.bronze : T.orange, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: 11 }}>{m.name.charAt(0)}</div>
                                     <div>
                                       <div style={{ fontWeight: 600, color: T.text }}>{m.name}</div>
-                                      <div style={{ fontSize: 10, color: T.textMuted }}>{m.status === 'active' ? `${m.package} • ${getScheduledRemaining(m)} preost.` : m.comment}</div>
+                                      <div style={{ fontSize: 10, color: T.textMuted }}>
+                                        {m.status === 'active' ? `${m.package} • ${getScheduledRemaining(m)} preost.` : m.comment}
+                                        {isIndPkg(m.package) && booked.length === 0 && <span style={{ color: indColor, marginLeft: 4 }}>ind.</span>}
+                                      </div>
                                     </div>
                                   </div>
                                   <span style={{ color: T.green, fontWeight: 700, fontSize: 16 }}>+</span>
@@ -587,17 +643,32 @@ export default function App() {
                         const slots = getWorkingSlots(d);
                         if (!slots.includes(time)) return <td key={d} style={{ background: T.bg, borderBottom: `1px solid ${T.border}` }} />;
                         const k = `${d}_${time}`, booked = slotMap[k] || [], isT = d === TODAY;
+                        const hasInd = booked.some(b => b.individual);
+                        const effTaken = slotTaken(booked);
+                        const indColor = '#a78bfa';
                         return (
                           <td key={d} style={{ padding: 2, borderBottom: `1px solid ${T.border}`, textAlign: 'center', background: isT ? T.surfaceLight : 'transparent', verticalAlign: 'top' }}>
                             {booked.length > 0 ? (
                               <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                                {booked.map((b, i) => (
-                                  <div key={i} onClick={() => { setSelId(b.memberId); setView('members'); }}
-                                    style={{ background: b.trial ? T.redBg : `linear-gradient(135deg,${T.bronze},${T.bronzeDark})`, color: b.trial ? T.red : '#fff', borderRadius: 4, padding: '2px 1px', fontSize: 8, fontWeight: 600, cursor: 'pointer', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    {b.trial ? 'P' : b.name.split(' ')[0].slice(0, 5)}
-                                  </div>
-                                ))}
-                                {booked.length < MAX_REFORMERS && <div style={{ color: T.textDim, fontSize: 7 }}>{MAX_REFORMERS - booked.length} sl.</div>}
+                                {hasInd ? (
+                                  <>
+                                    <div onClick={() => { setSelId(booked[0].memberId); setView('members'); }}
+                                      style={{ background: 'rgba(167,139,250,.18)', color: indColor, borderRadius: 4, padding: '2px 1px', fontSize: 8, fontWeight: 700, cursor: 'pointer', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', border: '1px solid rgba(167,139,250,.3)' }}>
+                                      {booked[0].name.split(' ')[0].slice(0, 5)}
+                                    </div>
+                                    <div style={{ color: indColor, fontSize: 7, opacity: 0.7 }}>IND</div>
+                                  </>
+                                ) : (
+                                  <>
+                                    {booked.map((b, i) => (
+                                      <div key={i} onClick={() => { setSelId(b.memberId); setView('members'); }}
+                                        style={{ background: b.trial ? T.redBg : `linear-gradient(135deg,${T.bronze},${T.bronzeDark})`, color: b.trial ? T.red : '#fff', borderRadius: 4, padding: '2px 1px', fontSize: 8, fontWeight: 600, cursor: 'pointer', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {b.trial ? 'P' : b.name.split(' ')[0].slice(0, 5)}
+                                      </div>
+                                    ))}
+                                    {effTaken < MAX_REFORMERS && <div style={{ color: T.textDim, fontSize: 7 }}>{MAX_REFORMERS - effTaken} sl.</div>}
+                                  </>
+                                )}
                               </div>
                             ) : <div style={{ color: T.textDim, fontSize: 10 }}>{MAX_REFORMERS}</div>}
                           </td>
