@@ -30,13 +30,13 @@ export async function POST(req: Request) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // optionally add a trial session right away
+  // optionally add a first session right away (trial or regular)
   if (body.trialDate && body.trialTime) {
     await supabase.from('sessions').insert({
       member_id: member.id,
       date: body.trialDate,
       time: body.trialTime,
-      trial: true,
+      trial: body.trial !== false, // default true, false only if explicitly set
     });
   }
 

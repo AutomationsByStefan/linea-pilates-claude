@@ -102,6 +102,8 @@ export default function App() {
   const [bookSearch, setBookSearch] = useState('');
   const [trialModal, setTrialModal] = useState<{ date: string; time: string } | null>(null);
   const [trialName, setTrialName] = useState('');
+  const [trialType, setTrialType] = useState(true); // true = Probni, false = Redovni
+  const [newMSession, setNewMSession] = useState({ add: false, date: getTodayStr(), time: '8h', trial: true });
   const [statMonth, setStatMonth] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
 
   useEffect(() => {
@@ -166,13 +168,21 @@ export default function App() {
 
   async function addMember() {
     if (!newM.name) return;
+    const body: Record<string, unknown> = { name: newM.name, phone: newM.phone };
+    if (newMSession.add) {
+      body.trialDate = newMSession.date;
+      body.trialTime = newMSession.time;
+      body.trial = newMSession.trial;
+    }
     const res = await fetch('/api/members', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newM.name, phone: newM.phone }),
+      body: JSON.stringify(body),
     });
     const created = await res.json();
     setMembers(prev => [...prev, created]);
-    setNewM({ name: '', phone: '' }); setShowAdd(false);
+    setNewM({ name: '', phone: '' });
+    setNewMSession({ add: false, date: getTodayStr(), time: '8h', trial: true });
+    setShowAdd(false);
   }
 
   async function bookSlot(memberId: string, date: string, time: string, trial = false) {
@@ -206,16 +216,16 @@ export default function App() {
     const { date, time } = trialModal;
     const existing = members.find(m => m.name.toLowerCase() === trialName.toLowerCase());
     if (existing) {
-      await bookSlot(existing.id, date, time, true);
+      await bookSlot(existing.id, date, time, trialType);
     } else {
       const res = await fetch('/api/members', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: trialName.trim(), phone: '', trialDate: date, trialTime: time }),
+        body: JSON.stringify({ name: trialName.trim(), phone: '', trialDate: date, trialTime: time, trial: trialType }),
       });
       const created = await res.json();
       setMembers(prev => [...prev, created]);
     }
-    setTrialModal(null); setTrialName(''); setBookingSlot(null); setBookSearch('');
+    setTrialModal(null); setTrialName(''); setTrialType(true); setBookingSlot(null); setBookSearch('');
   }
 
   const filteredMembers = members.filter(m => {
@@ -684,13 +694,41 @@ export default function App() {
         {showAdd && (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 1000 }}
             onClick={e => e.target === e.currentTarget && setShowAdd(false)}>
-            <div style={{ background: T.surface, borderRadius: '20px 20px 0 0', padding: 22, width: '100%', maxWidth: 500, border: `1px solid ${T.border}` }}>
+            <div style={{ background: T.surface, borderRadius: '20px 20px 0 0', padding: 22, width: '100%', maxWidth: 500, border: `1px solid ${T.border}`, maxHeight: '90vh', overflowY: 'auto' }}>
               <div style={{ width: 36, height: 4, background: T.borderLight, borderRadius: 2, margin: '0 auto 16px' }} />
               <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 14, color: T.gold }}>Nova članica</h3>
               <input placeholder="Ime i prezime *" value={newM.name} onChange={e => setNewM({ ...newM, name: e.target.value })} style={{ ...inputStyle, marginBottom: 10 }} />
               <input placeholder="Telefon" value={newM.phone} onChange={e => setNewM({ ...newM, phone: e.target.value })} style={{ ...inputStyle, marginBottom: 14 }} />
+
+              {/* Opcija: zakaži prvi termin odmah */}
+              <button onClick={() => setNewMSession(s => ({ ...s, add: !s.add }))}
+                style={{ width: '100%', padding: 10, borderRadius: 10, border: `1px dashed ${newMSession.add ? T.bronze : T.border}`, background: newMSession.add ? T.orangeBg : 'transparent', color: newMSession.add ? T.orange : T.textMuted, fontSize: 12, fontWeight: 600, cursor: 'pointer', marginBottom: newMSession.add ? 12 : 14, textAlign: 'left' }}>
+                {newMSession.add ? '▼' : '▶'} Zakaži prvi termin odmah (opciono)
+              </button>
+
+              {newMSession.add && (
+                <div style={{ padding: 14, background: T.surfaceLight, borderRadius: 12, border: `1px solid ${T.border}`, marginBottom: 14 }}>
+                  {/* Probni / Redovni toggle */}
+                  <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+                    {[{ v: true, l: 'Probni trening' }, { v: false, l: 'Redovni trening' }].map(opt => (
+                      <button key={String(opt.v)} onClick={() => setNewMSession(s => ({ ...s, trial: opt.v }))}
+                        style={{ flex: 1, padding: '8px 0', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                          background: newMSession.trial === opt.v ? (opt.v ? T.orangeBg : T.greenBg) : T.surfaceLighter,
+                          color: newMSession.trial === opt.v ? (opt.v ? T.orange : T.green) : T.textMuted }}>
+                        {opt.l}
+                      </button>
+                    ))}
+                  </div>
+                  <input type="date" value={newMSession.date} onChange={e => setNewMSession(s => ({ ...s, date: e.target.value }))} style={{ ...inputStyle, marginBottom: 8 }} />
+                  <select value={newMSession.time} onChange={e => setNewMSession(s => ({ ...s, time: e.target.value }))} style={inputStyle}>
+                    {getWorkingSlots(newMSession.date).map(t => <option key={t} value={t}>{t}</option>)}
+                    {getWorkingSlots(newMSession.date).length === 0 && <option value="">Neradni dan</option>}
+                  </select>
+                </div>
+              )}
+
               <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={() => setShowAdd(false)} style={{ ...btnSecondary, flex: 1, padding: 12 }}>Otkaži</button>
+                <button onClick={() => { setShowAdd(false); setNewMSession({ add: false, date: getTodayStr(), time: '8h', trial: true }); }} style={{ ...btnSecondary, flex: 1, padding: 12 }}>Otkaži</button>
                 <button onClick={addMember} style={{ ...btnPrimary, flex: 1, padding: 12 }}>Dodaj</button>
               </div>
             </div>
@@ -703,12 +741,28 @@ export default function App() {
             onClick={e => e.target === e.currentTarget && setTrialModal(null)}>
             <div style={{ background: T.surface, borderRadius: '20px 20px 0 0', padding: 22, width: '100%', maxWidth: 500, border: `1px solid ${T.border}` }}>
               <div style={{ width: 36, height: 4, background: T.borderLight, borderRadius: 2, margin: '0 auto 16px' }} />
-              <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4, color: T.gold }}>Probni trening</h3>
-              <p style={{ fontSize: 12, color: T.textMuted, marginBottom: 14 }}>{fmtDate(trialModal.date)} u {trialModal.time}</p>
+              <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4, color: T.gold }}>Nova osoba — {fmtDate(trialModal.date)} u {trialModal.time}</h3>
+
+              {/* Probni / Redovni toggle */}
+              <div style={{ display: 'flex', gap: 6, marginBottom: 14, marginTop: 10 }}>
+                {[{ v: true, l: 'Probni trening' }, { v: false, l: 'Redovni trening' }].map(opt => (
+                  <button key={String(opt.v)} onClick={() => setTrialType(opt.v)}
+                    style={{ flex: 1, padding: '9px 0', borderRadius: 10, border: 'none', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                      background: trialType === opt.v ? (opt.v ? T.orangeBg : T.greenBg) : T.surfaceLighter,
+                      color: trialType === opt.v ? (opt.v ? T.orange : T.green) : T.textMuted,
+                      outline: trialType === opt.v ? `1.5px solid ${opt.v ? T.orange : T.green}` : 'none' }}>
+                    {opt.l}
+                  </button>
+                ))}
+              </div>
+
               <input placeholder="Ime i prezime *" value={trialName} onChange={e => setTrialName(e.target.value)} autoFocus onKeyDown={e => e.key === 'Enter' && bookTrial()} style={{ ...inputStyle, marginBottom: 14 }} />
               <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={() => setTrialModal(null)} style={{ ...btnSecondary, flex: 1, padding: 12 }}>Otkaži</button>
-                <button onClick={bookTrial} style={{ ...btnPrimary, flex: 1, padding: 12, background: `linear-gradient(135deg, ${T.orange}, ${T.bronzeDark})` }}>Zakaži probni</button>
+                <button onClick={() => { setTrialModal(null); setTrialType(true); }} style={{ ...btnSecondary, flex: 1, padding: 12 }}>Otkaži</button>
+                <button onClick={bookTrial}
+                  style={{ ...btnPrimary, flex: 1, padding: 12, background: trialType ? `linear-gradient(135deg, ${T.orange}, ${T.bronzeDark})` : `linear-gradient(135deg, ${T.green}, #4a9e6a)` }}>
+                  Zakaži {trialType ? 'probni' : 'redovni'}
+                </button>
               </div>
             </div>
           </div>
