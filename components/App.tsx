@@ -36,6 +36,7 @@ const DAYS_SR = ['Ned','Pon','Uto','Sri','Čet','Pet','Sub'];
 const MONTHS_FULL = ['Januar','Februar','Mart','April','Maj','Jun','Jul','Avgust','Septembar','Oktobar','Novembar','Decembar'];
 const MONTHS = ['jan','feb','mar','apr','maj','jun','jul','avg','sep','okt','nov','dec'];
 function fmtDateShort(d: string) { const dt = new Date(d); return `${dt.getDate()}. ${MONTHS[dt.getMonth()]}`; }
+function fmtTrening(n: number) { return n === 1 ? '1 trening' : (n >= 2 && n <= 4) ? `${n} treninga` : `${n} treninga`; }
 
 const PACKAGES = [
   { name: 'Set 4', sessions: 4, price: 60 },
@@ -48,7 +49,7 @@ const PACKAGES = [
   { name: 'Set 12+2', sessions: 14, price: 175 },
   { name: 'Set 8 ind.', sessions: 8, price: 280 },
   { name: 'Set 12 ind.', sessions: 12, price: 360 },
-  { name: 'Pojedinačni', sessions: 1, price: 15 },
+  { name: 'Pojedinačni', sessions: 1, price: 25 },
 ];
 
 function isIndPkg(pkg: string) { return pkg.toLowerCase().includes('ind.'); }
@@ -432,7 +433,7 @@ export default function App() {
                   <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: `1px solid ${T.border}`, fontSize: 12 }}>
                     <span style={{ color: T.textMuted }}>{fmtDate(p.date)} — {p.package}</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontWeight: 700, color: T.green }}>{p.amount} KM ({p.sessions} tr.)</span>
+                      <span style={{ fontWeight: 700, color: T.green }}>{p.amount} KM ({fmtTrening(p.sessions)})</span>
                       <button onClick={() => deletePayment(member.id, p.id)}
                         style={{ background: T.redBg, color: T.red, border: `1px solid ${T.redBorder}`, borderRadius: 6, padding: '2px 7px', fontSize: 10, cursor: 'pointer', fontWeight: 700 }}>✕</button>
                     </div>
@@ -443,7 +444,7 @@ export default function App() {
                   <div style={{ marginTop: 12, padding: 12, background: T.surfaceLight, borderRadius: 10, border: `1px solid ${T.border}` }}>
                     <select value={payPkg} onChange={e => setPayPkg(e.target.value)} style={{ ...inputStyle, marginBottom: 8 }}>
                       <option value="">Izaberi paket</option>
-                      {PACKAGES.map(p => <option key={p.name} value={p.name}>{p.name} — {p.price} KM ({p.sessions} treninga)</option>)}
+                      {PACKAGES.map(p => <option key={p.name} value={p.name}>{p.name} — {p.price} KM ({fmtTrening(p.sessions)})</option>)}
                     </select>
                     <button onClick={() => addPayment(member.id)} style={{ ...btnPrimary, width: '100%', padding: 10 }}>Potvrdi uplatu</button>
                   </div>
