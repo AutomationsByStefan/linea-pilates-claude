@@ -44,9 +44,11 @@ const PACKAGES = [
   { name: 'Set 6+2', sessions: 8, price: 90 },
   { name: 'Set 8', sessions: 8, price: 125 },
   { name: 'Set 8+2', sessions: 10, price: 125 },
+  { name: 'Set 10', sessions: 10, price: 145 },
   { name: 'Set 10+2', sessions: 12, price: 145 },
   { name: 'Set 12', sessions: 12, price: 175 },
   { name: 'Set 12+2', sessions: 14, price: 175 },
+  { name: 'Set 16', sessions: 16, price: 200 },
   { name: 'Set 8 ind.', sessions: 8, price: 280 },
   { name: 'Set 12 ind.', sessions: 12, price: 360 },
   { name: 'Pojedinačni', sessions: 1, price: 25 },
@@ -64,6 +66,7 @@ function Badge({ type, text }: { type: string; text: string }) {
     trial: { bg: T.orangeBg, color: T.orange, border: T.orangeBorder },
     active: { bg: T.greenBg, color: T.green, border: T.greenBorder },
     expired: { bg: T.redBg, color: T.red, border: T.redBorder },
+    inactive: { bg: 'rgba(110,95,110,.15)', color: T.textDim, border: 'rgba(110,95,110,.3)' },
   };
   const s = styles[type] || styles.active;
   return <span style={{ background: s.bg, color: s.color, border: `1px solid ${s.border}`, padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap' }}>{text}</span>;
@@ -155,6 +158,7 @@ export default function App() {
   const totalRevenue = members.reduce((s, m) => s + m.paid, 0);
   const activeCount = members.filter(m => m.status === 'active').length;
   const trialCount = members.filter(m => m.status === 'trial').length;
+  const inactiveMembers = members.filter(m => m.status === 'inactive');
   const needPayment = members.filter(m => m.status === 'active' && getRemaining(m) <= 0);
 
   function shiftMonth(dir: number) {
@@ -232,6 +236,27 @@ export default function App() {
     setMembers(prev => prev.map(m => m.id === memberId ? updated : m));
   }
 
+  async function deleteMember(memberId: string) {
+    if (!confirm('Trajno obrisati ovu članicu? Ova akcija se ne može poništiti.')) return;
+    await fetch(`/api/members/${memberId}`, { method: 'DELETE' });
+    setMembers(prev => prev.filter(m => m.id !== memberId));
+    setSelId(null);
+  }
+
+  async function toggleInactive(memberId: string) {
+    const m = members.find(x => x.id === memberId);
+    if (!m) return;
+    const newStatus = m.status === 'inactive'
+      ? (m.totalSessions > 0 ? 'active' : 'trial')
+      : 'inactive';
+    const res = await fetch(`/api/members/${memberId}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: newStatus }),
+    });
+    const updated = await res.json();
+    setMembers(prev => prev.map(x => x.id === memberId ? updated : x));
+  }
+
   async function bookTrial() {
     if (!trialModal || !trialName.trim()) return;
     const { date, time } = trialModal;
@@ -254,7 +279,8 @@ export default function App() {
     if (filter === 'active') return m.status === 'active';
     if (filter === 'trial') return m.status === 'trial';
     if (filter === 'expired') return m.status === 'active' && getRemaining(m) <= 0;
-    return true;
+    if (filter === 'inactive') return m.status === 'inactive';
+    return m.status !== 'inactive';
   });
 
   function getWeek(off: number) {
@@ -365,6 +391,20 @@ export default function App() {
                 </Card>
               ))}
             </>}
+
+            {inactiveMembers.length > 0 && <>
+              <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 8, marginTop: 18, color: T.textDim }}>Neaktivne ({inactiveMembers.length})</h3>
+              {inactiveMembers.map(m => (
+                <Card key={m.id} onClick={() => { setSelId(m.id); setView('members'); }}
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', opacity: 0.6 }}>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: T.textMuted }}>{m.name}</div>
+                    <div style={{ fontSize: 11, color: T.textDim }}>{m.package || 'Bez paketa'}</div>
+                  </div>
+                  <Badge type="inactive" text="Neaktivna" />
+                </Card>
+              ))}
+            </>}
           </>}
 
           {/* ===== MEMBERS LIST ===== */}
@@ -374,7 +414,7 @@ export default function App() {
               <button onClick={() => setShowAdd(true)} style={{ ...btnPrimary, fontSize: 18, padding: '10px 16px' }}>+</button>
             </div>
             <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
-              {[{ id: 'all', l: 'Sve' }, { id: 'active', l: 'Aktivne' }, { id: 'trial', l: 'Probni' }, { id: 'expired', l: 'Bez paketa' }].map(f => (
+              {[{ id: 'all', l: 'Sve' }, { id: 'active', l: 'Aktivne' }, { id: 'trial', l: 'Probni' }, { id: 'expired', l: 'Bez paketa' }, { id: 'inactive', l: 'Neaktivne' }].map(f => (
                 <button key={f.id} onClick={() => setFilter(f.id)}
                   style={{ padding: '5px 12px', borderRadius: 20, border: 'none', fontSize: 11, cursor: 'pointer', fontWeight: 600, background: filter === f.id ? T.bronze : T.surfaceLight, color: filter === f.id ? '#fff' : T.textMuted }}>{f.l}</button>
               ))}
@@ -393,7 +433,7 @@ export default function App() {
                         <div style={{ fontSize: 11, color: T.textMuted }}>{m.package || 'Bez paketa'}{m.status === 'active' && ` • ${getUsedCount(m)}/${m.totalSessions} • ${rem} preost.`}</div>
                       </div>
                     </div>
-                    <Badge type={m.status === 'trial' ? 'trial' : rem <= 0 ? 'expired' : 'active'} text={m.status === 'trial' ? 'Probni' : `${rem}`} />
+                    <Badge type={m.status === 'inactive' ? 'inactive' : m.status === 'trial' ? 'trial' : rem <= 0 ? 'expired' : 'active'} text={m.status === 'inactive' ? 'Neaktivna' : m.status === 'trial' ? 'Probni' : `${rem}`} />
                   </Card>
                 );
               })}
@@ -402,7 +442,19 @@ export default function App() {
 
           {/* ===== MEMBER DETAIL ===== */}
           {view === 'members' && selId && member && <>
-            <button onClick={() => setSelId(null)} style={{ background: 'none', border: 'none', fontSize: 13, color: T.bronzeLight, cursor: 'pointer', fontWeight: 600, marginBottom: 14 }}>← Nazad</button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <button onClick={() => setSelId(null)} style={{ background: 'none', border: 'none', fontSize: 13, color: T.bronzeLight, cursor: 'pointer', fontWeight: 600 }}>← Nazad</button>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button onClick={() => toggleInactive(member.id)}
+                  style={{ padding: '6px 12px', borderRadius: 8, border: `1px solid ${member.status === 'inactive' ? T.greenBorder : 'rgba(110,95,110,.4)'}`, background: member.status === 'inactive' ? T.greenBg : 'rgba(110,95,110,.1)', color: member.status === 'inactive' ? T.green : T.textDim, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                  {member.status === 'inactive' ? '↩ Aktiviraj' : '⊘ Deaktiviraj'}
+                </button>
+                <button onClick={() => deleteMember(member.id)}
+                  style={{ padding: '6px 12px', borderRadius: 8, border: `1px solid ${T.redBorder}`, background: T.redBg, color: T.red, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                  Obriši
+                </button>
+              </div>
+            </div>
 
             <div style={{ background: `linear-gradient(135deg, ${T.bg}, ${T.surfaceLight})`, borderRadius: 18, padding: '20px 18px', border: `1px solid ${T.border}`, marginBottom: 14 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -412,8 +464,9 @@ export default function App() {
                   {member.firstPaidDate && <div style={{ fontSize: 12, color: T.textDim, marginTop: 2 }}>Prva uplata: {fmtDate(member.firstPaidDate)}</div>}
                   {member.trialDate && <div style={{ fontSize: 12, color: T.textDim, marginTop: 2 }}>Probni: {fmtDate(member.trialDate)}</div>}
                 </div>
-                <Badge type={member.status === 'trial' ? 'trial' : getRemaining(member) <= 0 ? 'expired' : 'active'}
-                  text={member.status === 'trial' ? 'Probni' : getRemaining(member) <= 0 ? 'Potrošen' : 'Aktivan'} />
+                <Badge
+                  type={member.status === 'inactive' ? 'inactive' : member.status === 'trial' ? 'trial' : getRemaining(member) <= 0 ? 'expired' : 'active'}
+                  text={member.status === 'inactive' ? 'Neaktivna' : member.status === 'trial' ? 'Probni' : getRemaining(member) <= 0 ? 'Potrošen' : 'Aktivan'} />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginTop: 16 }}>
                 <StatBox label="Iskorišćeno" value={getUsedCount(member)} accent={T.text} />

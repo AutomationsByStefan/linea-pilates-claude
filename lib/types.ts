@@ -23,7 +23,7 @@ export interface Member {
   package: string;
   packagePrice: number;
   paid: number;
-  status: 'active' | 'trial';
+  status: 'active' | 'trial' | 'inactive';
   note: string;
   firstPaidDate: string;
   sessions: Session[];
