@@ -112,6 +112,7 @@ export default function App() {
   const [weekOff, setWeekOff] = useState(0);
   const [bookingSlot, setBookingSlot] = useState<{ date: string; time: string } | null>(null);
   const [bookSearch, setBookSearch] = useState('');
+  const [bookAsTrial, setBookAsTrial] = useState(false);
   const [trialModal, setTrialModal] = useState<{ date: string; time: string } | null>(null);
   const [trialName, setTrialName] = useState('');
   const [trialType, setTrialType] = useState(true); // true = Probni, false = Redovni
@@ -604,7 +605,7 @@ export default function App() {
                           </div>
                         ))}
                         {free > 0 && !isBooking && (
-                          <button onClick={e => { e.stopPropagation(); setBookingSlot({ date: calDate, time }); setBookSearch(''); }}
+                          <button onClick={e => { e.stopPropagation(); setBookingSlot({ date: calDate, time }); setBookSearch(''); setBookAsTrial(false); }}
                             style={{ width: '100%', marginTop: 8, padding: 10, background: T.greenBg, color: T.green, border: `1px dashed ${T.greenBorder}`, borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
                             + Zakaži na {time}
                           </button>
@@ -613,7 +614,18 @@ export default function App() {
                           <div onClick={e => e.stopPropagation()} style={{ marginTop: 8, padding: 12, background: T.surfaceLight, borderRadius: 10, border: `1px solid ${T.border}` }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                               <span style={{ fontSize: 12, fontWeight: 700, color: T.bronzeLight }}>Zakaži na {time}</span>
-                              <button onClick={() => setBookingSlot(null)} style={{ background: 'none', border: 'none', fontSize: 14, cursor: 'pointer', color: T.textMuted }}>✕</button>
+                              <button onClick={() => { setBookingSlot(null); setBookAsTrial(false); }} style={{ background: 'none', border: 'none', fontSize: 14, cursor: 'pointer', color: T.textMuted }}>✕</button>
+                            </div>
+                            <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+                              {[{ v: false, l: 'Redovni' }, { v: true, l: 'Probni' }].map(opt => (
+                                <button key={String(opt.v)} onClick={e => { e.stopPropagation(); setBookAsTrial(opt.v); }}
+                                  style={{ flex: 1, padding: '7px 0', borderRadius: 8, border: 'none', fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                                    background: bookAsTrial === opt.v ? (opt.v ? T.orangeBg : T.greenBg) : T.surfaceLighter,
+                                    color: bookAsTrial === opt.v ? (opt.v ? T.orange : T.green) : T.textDim,
+                                    outline: bookAsTrial === opt.v ? `1.5px solid ${opt.v ? T.orange : T.green}` : 'none' }}>
+                                  {opt.l}
+                                </button>
+                              ))}
                             </div>
                             <input placeholder="Pretraži članice..." value={bookSearch} onChange={e => setBookSearch(e.target.value)} autoFocus style={{ ...inputStyle, marginBottom: 6 }} />
                             <div style={{ maxHeight: 180, overflowY: 'auto' }}>
@@ -623,7 +635,7 @@ export default function App() {
                                 </p>
                               )}
                               {bookableMembers.slice(0, 15).map(m => (
-                                <div key={m.id} onClick={() => { bookSlot(m.id, calDate, time, false); setBookingSlot(null); setBookSearch(''); }}
+                                <div key={m.id} onClick={() => { bookSlot(m.id, calDate, time, bookAsTrial); setBookingSlot(null); setBookSearch(''); setBookAsTrial(false); }}
                                   style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 6px', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}
                                   onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = T.surfaceLighter}
                                   onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}>
